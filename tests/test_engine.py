@@ -26,13 +26,13 @@ class EngineTests(unittest.TestCase):
         b=budget(F(99),0,F(100))
         self.assertEqual(b['available'],F(93,7))
         self.assertEqual(b['ratio'],93)
-        self.assertEqual(b['observed'],1)
+        self.assertEqual(b['used'],1)
 
     def test_second_example_ratio_before_floor(self):
         b=budget(F(84),1,F(88))
         self.assertEqual(b['plan'],F(116,7))
         self.assertEqual(b['available'],F(88,7))
-        self.assertEqual([whole(b[k]) for k in ('plan','available','observed','ratio')],['16','12','4','75'])
+        self.assertEqual([whole(b[k]) for k in ('plan','available','used','ratio')],['16','12','4','75'])
         self.assertNotEqual(b['ratio'],F(12,16)*100)
         first=budget(F(99),0,F(100))
         self.assertNotEqual(whole(first['ratio']),whole(F(int(whole(first['available'])),int(whole(first['plan'])))*100))
@@ -40,7 +40,7 @@ class EngineTests(unittest.TestCase):
     def test_last_bucket(self):
         b=budget(F('7.81'),6,F(15))
         self.assertEqual(b['available'],F('7.81'))
-        self.assertEqual(b['observed'],F('7.19'))
+        self.assertEqual(b['used'],F('7.19'))
 
     def test_zero_and_debt(self):
         b=budget(F(60),1,F(60))
@@ -64,8 +64,8 @@ class EngineTests(unittest.TestCase):
         self.assertIsNone(budget(F(90),0)['ratio'])
         b=budget(F(100),0,F(99))
         self.assertGreater(b['ratio'],100)
-        self.assertEqual(b['observed'],-1)
-        self.assertEqual(whole(b['observed']),'—')
+        self.assertEqual(b['used'],-1)
+        self.assertEqual(whole(b['used']),'—')
 
     def test_exact_floor_no_float_noise(self):
         for i in range(7):
@@ -85,12 +85,12 @@ class EngineTests(unittest.TestCase):
             self.assertEqual(days*86400+86400,WEEK-now)
             self.assertEqual(countdown((i+1)*86400-now),'24h 00m')
 
-    def test_calendar_seven_start_dates_no_eighth(self):
+    def test_calendar_overlap_eight_dates_seven_entries(self):
         start=int(datetime(2026,9,10,18,tzinfo=timezone.utc).timestamp())
         records=[{} for _ in range(7)]
         _,cells=month_cells(start,start+WEEK,start,records,timezone.utc)
         marked=[c for c in cells if c['highlighted']]
-        self.assertEqual([c['day'] for c in marked],[10,11,12,13,14,15,16])
+        self.assertEqual([c['day'] for c in marked],[10,11,12,13,14,15,16,17])
         self.assertEqual(sum(len(c['entries']) for c in cells),7)
         self.assertEqual(marked[1]['entries'][0]['plan'],'14')
         self.assertEqual(marked[0]['entries'][0]['plan'],'—')

@@ -60,7 +60,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(initial['plan'],second_view['plan'])
         self.assertEqual(len(self.marker.read_text().splitlines()),1)
         # A fresh panel opening cannot cause another server launch.
-        second.stdin.write(b'refresh\n'); second.stdin.flush()
+        second.stdin.write(b'stale\n'); second.stdin.flush()
         self.view(second)
         self.assertEqual(len(self.marker.read_text().splitlines()),1)
     def test_backoff_and_retry_guidance_survive_restart(self):
@@ -90,7 +90,7 @@ class RuntimeTests(unittest.TestCase):
             self.assertNotEqual(result.returncode,0)
         self.assertFalse(self.marker.exists())
 
-    def test_resume_gap_requests_fresh_reading(self):
+    def test_resume_fresh_reading_does_not_poll_again(self):
         process=self.launch()
         self.view(process)
         process.send_signal(signal.SIGSTOP)
@@ -99,7 +99,47 @@ class RuntimeTests(unittest.TestCase):
         finally:
             process.send_signal(signal.SIGCONT)
         self.view(process)
-        deadline=time.monotonic()+3
-        while len(self.marker.read_text().splitlines()) < 2 and time.monotonic()<deadline:
-            time.sleep(.05)
+        self.assertEqual(len(self.marker.read_text().splitlines()),1)
+
+    def test_manual_refresh_is_immediate_and_deduplicated(self):
+        process=self.launch()
+        initial=self.view(process,lambda v:v.get('valid') and not v.get('pending'))
+        process.stdin.write(b'refresh\n'*30); process.stdin.flush()
+        self.view(process,lambda v:v.get('pending'))
+        self.view(process,lambda v:v.get('valid') and not v.get('pending'))
         self.assertEqual(len(self.marker.read_text().splitlines()),2)
+        self.assertEqual(initial['plan'],'—')
+        # No old one-minute timer: a five-minute deadline is persisted.
+        database=self.root/'state/omarchy/codex-pace/ledger.sqlite3'
+        with sqlite3.connect(database) as db:
+            retry=json.loads(db.execute("SELECT value FROM meta WHERE key='retry'").fetchone()[0])
+        self.assertGreater(retry['due'],time.time()+290)
+
+    def test_virtual_boundary_refreshes_fresh_snapshot_once(self):
+        boundary=int(time.time())+3
+        self.env['PACE_TEST_RESET']=str(boundary+5*86400)
+        process=self.launch()
+        self.view(process,lambda v:v.get('valid') and not v.get('pending'))
+        self.view(process,lambda v:v.get('pending') and v.get('valid'))
+        view=self.view(process,lambda v:v.get('valid') and not v.get('pending'))
+        self.assertEqual(view['days'],'4')
+        self.assertEqual(view['daily'],'—')
+        self.assertEqual(len(self.marker.read_text().splitlines()),2)
+        process.stdin.write(b'stale\n'*10); process.stdin.flush()
+        self.view(process,lambda v:not v.get('pending'))
+        self.assertEqual(len(self.marker.read_text().splitlines()),2)
+
+    def test_failed_manual_refresh_preserves_success_timestamp(self):
+        process=self.launch()
+        self.view(process,lambda v:v.get('valid') and not v.get('pending'))
+        database=self.root/'state/omarchy/codex-pace/ledger.sqlite3'
+        def saved():
+            with sqlite3.connect(database) as db:
+                return json.loads(db.execute("SELECT value FROM meta WHERE key='reading'").fetchone()[0])['at']
+        before=saved()
+        # Change only the isolated fake CLI executable for its next invocation.
+        (self.root/'codex').write_text('#!'+sys.executable+'\nraise SystemExit(1)\n')
+        process.stdin.write(b'refresh\n'); process.stdin.flush()
+        view=self.view(process,lambda v: v.get('valid') and not v.get('pending') and 'Updated' in v['status'] and 'ago' in v['status'] and 'exited' in v['status'])
+        self.assertEqual(saved(),before)
+        self.assertEqual(view['weekly'],'99')

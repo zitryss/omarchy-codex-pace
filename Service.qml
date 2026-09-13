@@ -10,7 +10,13 @@ Item {
     property var previewView: null
     readonly property var view: previewView || liveView
     property bool stopping: false
-    function refresh() { if (worker.running) worker.write("refresh\n") }
+    function refresh() {
+        if (worker.running && !liveView.pending) {
+            liveView = Object.assign({}, liveView, {pending: true})
+            worker.write("refresh\n")
+        }
+    }
+    function refreshIfStale() { if (worker.running) worker.write("stale\n") }
     Process {
         id: worker
         command: ["python3", "-B", decodeURIComponent(Qt.resolvedUrl("pace.py").toString().replace(/^file:\/\//, "")), "watch"]
@@ -22,14 +28,14 @@ Item {
             }
         }
         onExited: {
-            root.liveView = Object.assign({}, root.liveView, {status: "Collector stopped · last reading retained"})
+            root.liveView = Object.assign({}, root.liveView, {status: "Collector stopped · last reading retained", pending: false})
             if (!root.stopping) restart.restart()
         }
     }
     // Explicit read-only test surface; synthetic data never enters the live ledger.
     function clearPreview() { previewView = null; previewExpiry.stop() }
     function preview(name) {
-        if (["normal", "debt", "zero", "correction", "stale", "expired", "auth", "year", "dst"].indexOf(name) < 0)
+        if (["normal", "unknown", "screenshot", "debt", "zero", "correction", "stale", "expired", "auth", "year", "dst"].indexOf(name) < 0)
             return "unknown fixture"
         if (previewWorker.running) return "busy"
         previewWorker.command = ["python3", "-B", decodeURIComponent(Qt.resolvedUrl("tests/preview.py").toString().replace(/^file:\/\//, "")), name]

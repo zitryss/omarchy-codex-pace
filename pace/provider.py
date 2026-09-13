@@ -139,10 +139,13 @@ def select(account, result, selected, now):
 
 async def collect(selected=None, command=None):
     async with RPC(command) as rpc:
-        await rpc.request('initialize', {'clientInfo': {'name':'codex-pace', 'version':'1.0.0'}})
+        await rpc.request('initialize', {'clientInfo': {'name':'codex-pace', 'version':'1.1.0'}})
         await rpc.send({'method':'initialized', 'params':{}})
         account = (await rpc.request('account/read')).get('account')
         if not isinstance(account, dict) or account.get('type') != 'chatgpt':
             raise Unavailable('Run codex login with your existing subscription')
+        requested_at = time.time()
         result = await rpc.request('account/rateLimits/read')
-        return select(account, result, selected, time.time())
+        reading = select(account, result, selected, time.time())
+        # Installed protocol has no verified provider sampling timestamp. Do not invent one.
+        return dict(reading, source_at=None, requested_at=requested_at, timing_quality='receipt timestamp')

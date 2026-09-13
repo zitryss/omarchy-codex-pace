@@ -1,5 +1,6 @@
 """Transactional, versioned minimal snapshot ledger. No credentials or conversations."""
 import json
+import math
 import sqlite3
 from .engine import WEEK, number, index, budget
 from .provider import Unavailable
@@ -9,7 +10,7 @@ class Store:
     def __init__(self, path):
         self.db = sqlite3.connect(path)
         version = self.db.execute('PRAGMA user_version').fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             self.db.close()
             raise Unavailable('Unsupported Codex Pace state schema')
         self.db.executescript('''
@@ -21,8 +22,19 @@ class Store:
         CREATE TABLE IF NOT EXISTS buckets (epoch INTEGER, idx INTEGER, opening TEXT,
           baseline_at REAL, quality TEXT, last_remaining TEXT, last_at REAL,
           PRIMARY KEY(epoch,idx));
-        PRAGMA user_version=1;
         ''')
+
+        if version < 2:
+            # Add evidence fields without rewriting or discarding legacy balances/baselines.
+            with self.db:
+                self.db.execute('BEGIN IMMEDIATE')
+                for definition in ("bucket_idx INTEGER", "source_at REAL", "requested_at REAL",
+                                   "timing_quality TEXT NOT NULL DEFAULT 'legacy receipt timestamp'"):
+                    self.db.execute('ALTER TABLE snapshots ADD COLUMN ' + definition)
+                self.db.execute("""UPDATE snapshots SET bucket_idx = CAST((at -
+                    (SELECT start FROM epochs WHERE id=epoch)) / 86400 AS INTEGER)""")
+                self.db.execute('PRAGMA user_version=2')
+        self.db.execute('CREATE INDEX IF NOT EXISTS snapshot_bucket_time ON snapshots(epoch,bucket_idx,at)')
 
     def get(self, key, default=None):
         row = self.db.execute('SELECT value FROM meta WHERE key=?', (key,)).fetchone()
@@ -31,11 +43,22 @@ class Store:
     def put(self, key, value):
         self.db.execute('INSERT OR REPLACE INTO meta VALUES (?,?)', (key, json.dumps(value)))
 
-    def accept(self, reading, interval=60, retention=90):
+    def accept(self, reading, interval=300, retention=90):
         previous = self.get('reading')
+        for key in ('at', 'source_at', 'requested_at'):
+            value = reading.get(key)
+            if value is not None and (type(value) not in (int, float) or not math.isfinite(value)):
+                raise Unavailable('Invalid quota observation timestamp')
+        source_at = reading.get('source_at')
+        if source_at is not None and reading.get('timing_quality') != 'source timestamp':
+            raise Unavailable('Unverified quota source timestamp')
+        if reading.get('requested_at') is not None and reading['requested_at'] > reading['at']:
+            raise Unavailable('Invalid quota request timestamp')
         if previous and reading['at'] <= previous['at']:
             raise Unavailable('Out-of-order quota reading ignored')
         same_identity = previous and all(previous[k] == reading[k] for k in ('account','bucket'))
+        if same_identity and previous['end'] == reading['end'] and source_at is not None and previous.get('source_at') is not None and source_at < previous['source_at']:
+            raise Unavailable('Out-of-order quota source timestamp ignored')
         changed = same_identity and previous['end'] != reading['end']
         if changed and self.db.execute('SELECT 1 FROM epochs WHERE account=? AND bucket=? AND end=?',
                 tuple(reading[k] for k in ('account','bucket','end'))).fetchone():
@@ -61,20 +84,16 @@ class Store:
                 self.db.execute('INSERT OR IGNORE INTO buckets(epoch,idx) VALUES (?,?)', (epoch,n))
             old = self.db.execute('SELECT at,remaining FROM snapshots WHERE epoch=? ORDER BY at DESC LIMIT 1', (epoch,)).fetchone()
             correction = bool(old and r > number(old[1]))
-            self.db.execute('INSERT INTO snapshots VALUES (?,?,?,?,?)',
-                            (epoch,reading['at'],str(r),reading['precision'],int(correction)))
-            row = self.db.execute('SELECT opening FROM buckets WHERE epoch=? AND idx=?', (epoch,i)).fetchone()
-            if row[0] is None:
-                boundary = reading['start'] + i * WEEK // 7
-                opening, baseline, quality = r, reading['at'], 'Since tracking began'
-                if reading['at'] == boundary:
-                    quality = 'Opening observed'
-                elif old and 0 <= boundary-old[0] <= min(interval,120) and 0 <= reading['at']-boundary <= min(interval,120) and r <= number(old[1]):
-                    opening, baseline, quality = number(old[1]), old[0], 'Opening estimated from close boundary observations'
-                self.db.execute('UPDATE buckets SET opening=?,baseline_at=?,quality=? WHERE epoch=? AND idx=?',
-                                (str(opening),baseline,quality,epoch,i))
-            self.db.execute('UPDATE buckets SET last_remaining=?,last_at=? WHERE epoch=? AND idx=?',
-                            (str(r),reading['at'],epoch,i))
+            source_at = reading.get('source_at')
+            evidence_at = source_at if source_at is not None else reading['at']
+            evidence_bucket = index(reading['start'], reading['end'], evidence_at)
+            if evidence_bucket is None or evidence_at > reading['at']:
+                raise Unavailable('Invalid quota observation timestamp')
+            self.db.execute("""INSERT INTO snapshots
+                (epoch,at,remaining,precision,correction,bucket_idx,source_at,requested_at,timing_quality)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (epoch,reading['at'],str(r),reading['precision'],int(correction),evidence_bucket,
+                 source_at,reading.get('requested_at'),reading.get('timing_quality','receipt timestamp')))
             reading = dict(reading, epoch=epoch, correction=correction)
             self.put('reading', reading)
             self.put('pending', None)
@@ -85,14 +104,41 @@ class Store:
             self.db.execute('DELETE FROM epochs WHERE end < ?', (cutoff,))
         return reading
 
-    def records(self, reading):
+    def records(self, reading, now=None):
+        """Derive plans/use only from supported boundary evidence; never a launch denominator.
+
+        Legacy bucket rows remain available to export, but their launch/estimated balances
+        are not opening evidence. Source timestamps are only populated by verified sources,
+        never by renaming a local receipt timestamp.
+        """
+        active = index(reading['start'], reading['end'], reading['at'] if now is None else now)
+        boundaries = [reading['start'] + i * WEEK // 7 for i in range(8)]
+        rows = self.db.execute("""SELECT source_at,remaining,at FROM snapshots
+            WHERE epoch=? AND timing_quality='source timestamp' AND source_at IN (?,?,?,?,?,?,?,?)
+            ORDER BY at""", (reading['epoch'], *boundaries)).fetchall()
+        openings = {}
+        for source_at, balance, received in rows:
+            # The first supported basis is frozen. Later corrections do not replace it.
+            openings.setdefault(source_at, (number(balance), received))
         result = []
-        for i, opening, at, quality, last, last_at in self.db.execute(
-                'SELECT idx,opening,baseline_at,quality,last_remaining,last_at FROM buckets WHERE epoch=? ORDER BY idx', (reading['epoch'],)):
-            opening = number(opening) if opening is not None else None
-            observed = opening - number(last) if opening is not None and last is not None else None
-            # Partial tracking is never presented as full-bucket consumption.
-            result.append(dict(plan=budget(number(reading['remaining']),i,opening)['plan'], opening=opening,
-                               observed=observed if quality and quality != 'Since tracking began' else None,
-                               net=observed, quality=quality or 'Opening unknown', baseline=at, last_at=last_at))
+        for i in range(7):
+            opening = openings.get(boundaries[i])
+            last = self.db.execute("""SELECT remaining,at,source_at,timing_quality,requested_at
+                FROM snapshots WHERE epoch=? AND bucket_idx=? ORDER BY at DESC LIMIT 1""",
+                (reading['epoch'], i)).fetchone()
+            closing = openings.get(boundaries[i+1])
+            end_balance = number(last[0]) if last and i == active else closing[0] if closing else None
+            net = opening[0] - end_balance if opening and end_balance is not None else None
+            quality = 'Opening supported by source timestamp' if opening else 'Bucket opening balance unavailable.'
+            if last:
+                quality += '\nLast evidence: ' + last[3]
+                quality += '\nReceived UTC seconds: ' + str(last[1])
+                if last[4] is not None:
+                    quality += '\nRequest started UTC seconds: ' + str(last[4])
+            if i != active and not closing:
+                quality += '\nBucket closing balance unavailable.'
+            result.append(dict(plan=budget(number(reading['remaining']),i,opening[0] if opening else None)['plan'],
+                               opening=opening[0] if opening else None, used=net, net=net,
+                               quality=quality, baseline=boundaries[i] if opening else None,
+                               last_at=last[1] if last else None))
         return result

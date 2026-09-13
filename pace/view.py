@@ -3,10 +3,10 @@ from datetime import datetime
 from .engine import number, index, budget, whole, countdown, month_cells, WEEK
 
 
-def project(store, now, interval=60, error=''):
+def project(store, now, interval=300, error=''):
     reading = store.get('reading')
-    empty = dict(available='—', daily='—', weekly='—', plan='—', observed='—', days='—',
-                 countdown='—', credits='—', dailyFill=0, weeklyFill=0, cells=[], month='',
+    empty = dict(available='—', daily='—', weekly='—', plan='—', used='—', days='—',
+                 countdown='—', credits='—', dailyFill=0, dailyKnown=False, weeklyFill=0, cells=[], month='',
                  status=error or 'Reading Codex quota…', note='', detail='', valid=False)
     if not reading:
         return empty
@@ -18,7 +18,7 @@ def project(store, now, interval=60, error=''):
     if error:
         status = error + ' · ' + status
     i = index(reading['start'],reading['end'],now)
-    records = store.records(reading)
+    records = store.records(reading, now)
     month, cells = month_cells(reading['start'],reading['end'],now,records)
     empty.update(status=status, cells=cells, month=month, credits=whole(reading['credits']))
     if i is None:
@@ -33,11 +33,9 @@ def project(store, now, interval=60, error=''):
     notes = []
     if b['plan'] == 0:
         notes.append('No allowance available')
-    if record['quality'] == 'Since tracking began':
-        notes.append('Since tracking began')
     if reading.get('short'):
         notes.append('Shorter quota window exhausted')
-    if reading.get('correction') or (b['observed'] is not None and b['observed'] < 0) or (b['ratio'] is not None and b['ratio'] > 100):
+    if reading.get('correction') or (b['used'] is not None and b['used'] < 0) or (b['ratio'] is not None and b['ratio'] > 100):
         notes.append('Provider balance correction')
     daily = whole(b['ratio'])
     weekly = whole(r)
@@ -45,14 +43,14 @@ def project(store, now, interval=60, error=''):
     detail = (f"{reading['bucket']} · {reading['provenance']}\n{record['quality']}\n"
               f"Baseline: {local_time(record['baseline'])}\nWeekly deadline: {local_time(reading['end'])}\n"
               f"{reading['precision']}; measurement rounding unspecified.\n"
-              f"Observed is net change; gaps are not assigned to later buckets.")
+              f"Used is net change; gaps are not assigned to later buckets.")
     if b['debt']:
         detail += '\nEstimated over-plan: '+whole(b['debt'])+' weekly points'
     if record['net'] is not None and record['net'] < 0:
         detail += '\nNet correction: '+whole(-record['net'])+' weekly points returned'
     return dict(available=whole(b['available']), daily=daily, weekly=weekly, plan=whole(b['plan']),
-                observed=whole(record['observed']), days=str(6-i),
+                used=whole(record['used']), days=str(6-i),
                 countdown=countdown(reading['start']+(i+1)*WEEK//7-now),
-                credits=whole(reading['credits']), dailyFill=min(100,max(0,int(daily))) if daily != '—' else 0,
+                credits=whole(reading['credits']), dailyKnown=b['ratio'] is not None, dailyFill=min(100,max(0,int(daily))) if daily != '—' else 0,
                 weeklyFill=int(weekly), cells=cells, month=month, status=status,
                 note=' · '.join(notes), detail=detail, valid=True)

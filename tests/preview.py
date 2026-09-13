@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from pace.engine import WEEK
 from pace.store import Store
@@ -12,14 +13,16 @@ from pace.view import project
 
 
 def fixture(name):
-    if name not in ('normal','debt','zero','correction','stale','expired','auth','year','dst'):
+    if name not in ('normal','unknown','screenshot','debt','zero','correction','stale','expired','auth','year','dst'):
         raise ValueError('Unknown fixture')
     start=int(datetime(2026,12,29 if name=='year' else 10,18,tzinfo=timezone.utc).timestamp())
+    if name in ('unknown','screenshot'):
+        start=int(datetime(2026,9,12,10,26,tzinfo=ZoneInfo('Europe/Berlin')).timestamp())
     if name=='dst':
         start=int(datetime(2026,3,27,18,tzinfo=timezone.utc).timestamp())
     def reading(at, r):
         return dict(account='synthetic',bucket='fixture',start=start,end=start+WEEK,at=at,
-                    remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
+                    source_at=at if name!='unknown' else None, timing_quality='source timestamp' if name!='unknown' else 'receipt timestamp',remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
     with tempfile.TemporaryDirectory(prefix='codex-pace-fixture-') as temp:
         store=Store(Path(temp)/'fixture.sqlite3')
         if name=='auth':
@@ -31,8 +34,11 @@ def fixture(name):
             if name=='correction':
                 now+=10; store.accept(reading(now,'95'))
             elif name not in ('debt','zero'):
-                now+=10; store.accept(reading(now,'84'))
-            if name=='stale': now+=180
+                now+=10; store.accept(reading(now,'87' if name in ('unknown','screenshot') else '84'))
+            if name in ('unknown','screenshot'):
+                now=start+86400+10*3600+23*60
+                store.accept(reading(now,'87'))
+            if name=='stale': now+=601
             if name=='expired': now=start+WEEK
             view=project(store,now)
         view['fixture']=name

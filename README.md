@@ -1,7 +1,7 @@
 # Codex Pace
 
 A native Omarchy bar icon and dropdown for pacing an existing Codex subscription.
-One actual provider week, seven equal elapsed-time days, and a small local ledger.
+One actual provider week, seven equal elapsed-time planning buckets, and a small local ledger.
 Python standard library + QML; no model calls, API key, token copies or credit redemption.
 
 ## Install
@@ -35,29 +35,39 @@ it as unavailable. The backend account ID is required and stored only as a SHA-2
 Each account/bucket/week has its own records.
 
 ```bash
-python3 -B ~/.config/omarchy/plugins/c3po.codex-pace/pace.py configure --interval 60 --retention 90
+python3 -B ~/.config/omarchy/plugins/c3po.codex-pace/pace.py configure --interval 300 --retention 90
 python3 -B ~/.config/omarchy/plugins/c3po.codex-pace/pace.py status
 omarchy-shell shell summon c3po.codex-pace
 ```
 
-Refresh interval: 30–3600 seconds. Retention: 7–365 days. Defaults: 60 seconds / 90 days.
-Panel opening and Enter, Space or R request a refresh only when the reading is old
-enough; requests are deduplicated and cannot bypass an active retry delay. Escape closes,
-Up/Down or J/K scroll on short screens, and Tab switches to a neighboring native panel.
+Refresh interval: 30–3600 seconds. Retention: 7–365 days. Defaults: **300 seconds / 90 days**.
+The original unmarked 60-second saved default migrates to 300; identifiable custom
+intervals are retained. `configure --interval 60` explicitly keeps a one-minute choice.
+Panel opening/resume refreshes an old reading; virtual boundaries request one refresh.
+The footer's two-arrow **Refresh** button, Enter, Space or R requests an immediate read.
+Requests are deduplicated, including across monitors, and respect server retry guidance.
+The button dims while pending. Failures retain the successful reading's original age.
+Escape closes; Up/Down or J/K scroll. Tab focuses Refresh, then switches native panels.
 The icon accepts mouse clicks and keyboard activation. No keybinding is installed.
-Hover a calendar cell for its exact local range and baseline quality; hover the update
-status for the weekly deadline, correction and over-plan details.
+Hover a calendar cell for overlapping bucket ranges and opening evidence; hover the
+update status for the weekly deadline, correction and over-plan details.
 
 ## Accounting and local data
 
-Seven exact 100/7 grants follow the provider's actual 168-hour window. Carryover/debt
+Seven exact 100/7 allocations follow the provider's actual 168-hour window. Surplus/debt
 is reflected once in the frozen opening plan. All displayed amounts are floored after
-exact rational calculation. Mid-bucket first runs are marked “Since tracking began”;
-unknown observations stay unknown. Corrections are preserved, and expired weeks wait
-for a fresh reading. The calendar contains exactly seven bucket start-date entries.
-See [ACCOUNTING.md](ACCOUNTING.md) for formulas, timing/precision quality, reset handling
-and collector design. This is a pacing guide, not enforcement or a promise that a
-shorter quota window permits use.
+exact rational calculation. **Unknown openings show Plan, Used and daily percentage
+as —**; available quota, weekly balance and countdowns remain useful. A launch-time
+balance is not a bucket opening. The installed app-server supplies no verified sampling
+timestamp, so receipt-only boundary readings remain uncertain and cannot establish
+full-bucket usage. No equal-allocation backfill or launch denominator is used.
+
+The calendar highlights every date overlapping the provider week; an active bucket has
+a light-blue fill, and the actual local date has a dark-red outline. Seven P/U entries
+remain attached once to bucket start dates. A midday reset normally touches eight dates;
+an exact-midnight endpoint excludes the new date. Future P is the base forecast 14,
+not a known opening plan. See [ACCOUNTING.md](ACCOUNTING.md) for evidence semantics.
+This is a pacing guide, not enforcement or a promise that a shorter limit permits use.
 
 Private local state is under `${XDG_STATE_HOME:-~/.local/state}/omarchy/codex-pace/`.
 The SQLite ledger has a versioned transactional schema, 90-day default retention and
@@ -117,7 +127,7 @@ omarchy-shell shell summon c3po.codex-pace
 omarchy-shell c3po.codex-pace.HDMI-A-1 clearPreview
 ```
 
-Available fixtures: `normal`, `debt`, `zero`, `correction`, `stale`, `expired`, `auth`,
+Available fixtures: `normal`, `unknown`, `screenshot`, `debt`, `zero`, `correction`, `stale`, `expired`, `auth`,
 `year`, `dst`. `tests/preview.py NAME` also emits their JSON without opening a window.
 See [VALIDATION.md](VALIDATION.md) for recorded checks and live-test limits.
 
@@ -125,3 +135,23 @@ References: [Omarchy native shell](https://github.com/basecamp/omarchy/blob/quat
 [Codex app-server](https://learn.chatgpt.com/docs/app-server),
 [Codex authentication](https://learn.chatgpt.com/docs/auth).
 The installed Omarchy source and generated Codex schema take precedence over these references.
+
+## Revision rollback
+
+Schema 2 preserves legacy snapshots and baseline rows; it does not erase useful history.
+Before upgrading a schema-1 installation, disable the plugin and back up its ledger and
+settings in the state directory. This installation has that backup in `backups/revision-1.1`.
+To restore this installation's previous release, first preserve post-upgrade history:
+
+```bash
+omarchy plugin disable c3po.codex-pace
+python3 -B ~/.config/omarchy/plugins/c3po.codex-pace/pace.py export >   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/post-upgrade-history.json"
+git -C ~/.config/omarchy/plugins/c3po.codex-pace switch --detach a900f78ef245ed54bd2a59902e0f0b7f79ad16bb
+cp -p "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/ledger.sqlite3"   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/ledger.sqlite3"
+cp -p "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/settings.json"   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/settings.json"
+omarchy plugin enable c3po.codex-pace --after omarchy.agents
+omarchy restart shell
+```
+
+This restores the older ledger from its backup; the export retains newer evidence for
+reference. Ordinary disable/uninstall does not restore or delete history.

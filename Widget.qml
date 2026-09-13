@@ -20,15 +20,16 @@ Panel {
     implicitHeight: button.implicitHeight
     function val(key) { return view[key] === undefined ? "—" : String(view[key]) }
     function pct(key) { return val(key) === "—" ? "—" : val(key) + "%" }
-    onOpenedChanged: if (opened && service) service.refresh()
+    onOpenedChanged: if (opened && service) service.refreshIfStale()
 
     // IPC belongs to the visual scene; one distinct endpoint per monitor.
     IpcHandler {
         enabled: !!root.QsWindow.window && !!root.QsWindow.window.screen
         target: root.moduleName + "." + (root.QsWindow.window?.screen?.name || "pending")
-        function status(): string { return JSON.stringify({opened: root.opened, scrollY: flick.contentY, contentHeight: flick.contentHeight, viewportHeight: flick.height, view: root.view}) }
+        function status(): string { return JSON.stringify({opened: root.opened, scrollY: flick.contentY, contentHeight: flick.contentHeight, viewportHeight: flick.height, refreshFocused: refreshButton.activeFocus, refreshPosition: refreshButton.mapToGlobal(refreshButton.width/2, refreshButton.height/2), view: root.view}) }
         function open(): void { root.open() }
         function close(): void { root.close() }
+        function refresh(): void { if (root.service) root.service.refresh() }
         function preview(name: string): string { return root.service ? root.service.preview(name) : "unavailable" }
         function clearPreview(): void { if (root.service) root.service.clearPreview() }
     }
@@ -65,7 +66,13 @@ Panel {
             id: keys
             anchors.fill: parent
             onCloseRequested: root.close()
-            onTabRequested: direction => root.switchPanel(direction)
+            onTabRequested: direction => {
+                if (!refreshButton.activeFocus) {
+                    flick.contentY = Math.max(0, flick.contentHeight - flick.height)
+                    refreshButton.forceActiveFocus()
+                }
+                else root.switchPanel(direction)
+            }
             onActivateRequested: { if (root.service) root.service.refresh() }
             onMoveRequested: (dx, dy) => {
                 flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + dy * Style.space(45)))
@@ -91,7 +98,7 @@ Panel {
                         Repeater {
                             model: [
                                 {label: "Available today", value: root.pct("available"), sub: "of weekly quota"},
-                                {label: "Day ends in", value: root.val("countdown"), sub: ""},
+                                {label: "Bucket resets in", value: root.val("countdown"), sub: ""},
                                 {label: "Weekly reset", value: root.val("days"), sub: "days left"}
                             ]
                             ColumnLayout {
@@ -139,7 +146,12 @@ Panel {
                             }
                         }
                     }
-                    Label { text: "Plan " + root.val("plan") + " · Observed " + root.val("observed") }
+                    Label {
+                        text: "Plan " + root.val("plan") + " · Used " + root.val("used")
+                        MouseArea { id: planHover; anchors.fill: parent; hoverEnabled: true }
+                        ToolTip.visible: planHover.containsMouse && root.val("plan") === "—"
+                        ToolTip.text: "Bucket opening balance unavailable."
+                    }
                     Label {
                         visible: !!root.view.note
                         text: root.view.note || ""
@@ -154,7 +166,7 @@ Panel {
                         RowLayout {
                             width: parent.width
                             Label { text: root.view.month || ""; font.bold: true; Layout.fillWidth: true }
-                            Label { text: "P plan · O observed"; font.pixelSize: Style.font.body - 2; color: root.muted }
+                            Label { text: "P plan · U used"; font.pixelSize: Style.font.body - 2; color: root.muted }
                         }
                         Grid {
                             width: parent.width
@@ -182,30 +194,30 @@ Panel {
                                     required property var modelData
                                     width: parent.width / 7
                                     height: Style.space(58)
-                                    color: modelData.active ? Qt.alpha(Color.accent, 0.28) : modelData.highlighted ? Qt.alpha(Color.accent, 0.12) : "transparent"
-                                    border.width: modelData.active ? 1 : 0
-                                    border.color: Color.accent
+                                    color: modelData.active ? "#a6c8ff" : modelData.highlighted ? Qt.alpha(Color.accent, 0.12) : "transparent"
+                                    border.width: modelData.today ? 2 : 0
+                                    border.color: "#a33b4d"
                                     Column {
                                         anchors.centerIn: parent
                                         spacing: Style.space(3)
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             text: cell.modelData.day
-                                            color: cell.modelData.muted ? root.muted : root.fg
+                                            color: cell.modelData.active ? "#182337" : cell.modelData.muted ? root.muted : root.fg
                                             font.bold: cell.modelData.active
                                         }
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
-                                            visible: cell.modelData.highlighted
+                                            visible: cell.modelData.entries.length > 0
                                             text: cell.modelData.entries.length ? "P " + cell.modelData.entries[0].plan : ""
-                                            color: cell.modelData.entries.length && cell.modelData.entries[0].future ? root.muted : root.fg
+                                            color: cell.modelData.active ? "#182337" : cell.modelData.entries.length && cell.modelData.entries[0].future ? root.muted : root.fg
                                             font.pixelSize: Style.font.body - 3
                                         }
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
-                                            visible: cell.modelData.highlighted
-                                            text: cell.modelData.entries.length ? "O " + cell.modelData.entries[0].observed : ""
-                                            color: root.muted
+                                            visible: cell.modelData.entries.length > 0
+                                            text: cell.modelData.entries.length ? "U " + cell.modelData.entries[0].used : ""
+                                            color: cell.modelData.active ? "#354663" : root.muted
                                             font.pixelSize: Style.font.body - 3
                                         }
                                     }
@@ -222,16 +234,31 @@ Panel {
                         Label { text: "Resets available"; Layout.fillWidth: true }
                         Label { text: root.val("credits"); font.bold: true }
                     }
-                    Label {
+                    RowLayout {
                         width: parent.width
-                        text: root.val("status")
-                        color: root.muted
-                        font.pixelSize: Style.font.body - 2
-                        wrapMode: Text.WordWrap
-                        MouseArea { id: statusHover; anchors.fill: parent; hoverEnabled: true }
-                        ToolTip.visible: statusHover.containsMouse
-                        ToolTip.delay: 550
-                        ToolTip.text: root.view.detail || ""
+                        Label {
+                            Layout.fillWidth: true
+                            text: root.val("status")
+                            color: root.muted
+                            font.pixelSize: Style.font.body - 2
+                            wrapMode: Text.WordWrap
+                            MouseArea { id: statusHover; anchors.fill: parent; hoverEnabled: true }
+                            ToolTip.visible: statusHover.containsMouse
+                            ToolTip.delay: 550
+                            ToolTip.text: root.view.detail || ""
+                        }
+                        PanelActionButton {
+                            id: refreshButton
+                            iconText: "󰁪"
+                            tooltipText: root.view.pending ? "Refreshing…" : "Refresh"
+                            Accessible.name: "Refresh"
+                            Accessible.role: Accessible.Button
+                            Accessible.description: root.view.pending ? "Refreshing quota statistics" : "Refresh quota statistics"
+                            focusable: true
+                            enabled: !root.view.pending
+                            opacity: root.view.pending ? 0.45 : 1
+                            onClicked: if (root.service) root.service.refresh()
+                        }
                     }
                 }
             }
