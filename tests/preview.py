@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Synthetic UI fixtures, generated in temporary SQLite; never access the real ledger/provider."""
+import json
+from pathlib import Path
+import sys
+import tempfile
+from datetime import datetime, timezone
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from pace.engine import WEEK
+from pace.store import Store
+from pace.view import project
+
+
+def fixture(name):
+    if name not in ('normal','debt','zero','correction','stale','expired','auth','year','dst'):
+        raise ValueError('Unknown fixture')
+    start=int(datetime(2026,12,29 if name=='year' else 10,18,tzinfo=timezone.utc).timestamp())
+    if name=='dst':
+        start=int(datetime(2026,3,27,18,tzinfo=timezone.utc).timestamp())
+    def reading(at, r):
+        return dict(account='synthetic',bucket='fixture',start=start,end=start+WEEK,at=at,
+                    remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
+    with tempfile.TemporaryDirectory(prefix='codex-pace-fixture-') as temp:
+        store=Store(Path(temp)/'fixture.sqlite3')
+        if name=='auth':
+            view=project(store,start,error='Run codex login with your existing subscription')
+        else:
+            now=start+86400
+            opening='60' if name in ('debt','zero') else '88'
+            store.accept(reading(now,opening))
+            if name=='correction':
+                now+=10; store.accept(reading(now,'95'))
+            elif name not in ('debt','zero'):
+                now+=10; store.accept(reading(now,'84'))
+            if name=='stale': now+=180
+            if name=='expired': now=start+WEEK
+            view=project(store,now)
+        view['fixture']=name
+        store.db.close()
+        return view
+
+
+if __name__=='__main__':
+    print(json.dumps(fixture(sys.argv[1])))

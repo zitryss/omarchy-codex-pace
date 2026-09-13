@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "c3po.codex-pace",
+  "name": "Codex Pace",
+  "version": "1.0.0",
+  "author": "zitryss",
+  "license": "MIT",
+  "description": "Pace a Codex subscription across seven provider-aligned daily buckets.",
+  "kinds": ["service", "bar-widget"],
+  "entryPoints": {"service": "Service.qml", "barWidget": "Widget.qml"},
+  "barWidget": {
+    "displayName": "Codex Pace", "category": "System", "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
