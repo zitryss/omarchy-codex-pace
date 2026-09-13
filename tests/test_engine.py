@@ -93,7 +93,7 @@ class EngineTests(unittest.TestCase):
         self.assertEqual([c['day'] for c in marked],[10,11,12,13,14,15,16,17])
         self.assertEqual(sum(len(c['entries']) for c in cells),7)
         self.assertEqual(marked[1]['entries'][0]['plan'],'14')
-        self.assertEqual(marked[0]['entries'][0]['plan'],'—')
+        self.assertEqual(marked[0]['entries'][0]['plan'],'14')
         self.assertEqual(datetime.fromisoformat(cells[0]['date']).weekday(),0)
 
     def test_year_month_and_dst(self):

@@ -1,9 +1,9 @@
 # Validation record
 
-Validated locally on 2026-09-13 with Omarchy 4.0.3-1, Codex CLI 0.153.4,
+Version **1.2.0** validated locally on 2026-09-13 with Omarchy 4.0.3-1, Codex CLI 0.153.4,
 Python 3.14.7 and the installed Qt 6/Quickshell runtime.
 
-- **61 tests passed** (`python3 -B -m unittest discover -s tests -v`, 26.9 seconds).
+- **71 tests passed** (`python3 -B -m unittest discover -s tests -v`, 26.9 seconds).
 - Installed `omarchy plugin validate .` passed.
 - QML analysis passed with zero remaining warnings/errors after treating the installed
   host's dynamic-property metadata and Quickshell's missing `QProcess::ExitStatus`
@@ -11,8 +11,11 @@ Python 3.14.7 and the installed Qt 6/Quickshell runtime.
 - Live read-only account/rate-limit RPC succeeded using the existing CLI login.
   `codex` was explicitly selected; no model preference or credential file was edited.
 - The real panel rendered the three top metrics, two independently sized draining bars,
-  honest unknown opening metrics, seven P/U start-date entries, eight overlapping dates,
-  two active-bucket date fills, today’s red outline and reset count.
+  standard-plan fallback metrics, seven P/U start-date entries, eight overlapping dates,
+  muted active-bucket fills, the thicker current-date outline and reset count.
+  The fallback fixture showed 102%, Plan 14, Used 0* and first-bucket U 14*.
+  The supported-opening fixture showed 93%, Plan 16 and Used 1 without a current
+  estimate marker. Both progress bars and the full basis tooltip rendered correctly.
   Text, contrast, spacing and popup anchoring were inspected on the running desktop.
 - Native pointer clicks opened, closed and reopened the icon's dropdown. An outside
   click dismissed it. Enter/Space use the refresh handler; Enter and Escape were
@@ -25,10 +28,13 @@ Python 3.14.7 and the installed Qt 6/Quickshell runtime.
 - Clearly labeled synthetic previews were inspected for ordinary carryover, debt/zero
   allowance, correction above 100%, stale data, expired reset and unavailable login in
   the initial release. This revision additionally inspected the screenshot and unknown
-  opening fixtures, including the new overlap layers at 1× and 2× scale.
+  opening fixtures in 1.1.0 at 1× and 2× scale. Version 1.2.0 rechecked fallback and
+  supported-opening fixtures at 1×, including the restrained estimate legend.
   Fixtures use temporary SQLite databases and never enter personal history.
 - Disabling stopped the owned helper and preserved the ledger. Re-enabling restored
-  the retained history with unsupported opening values unavailable. Reload and restart checks found no duplicate collectors.
+  retained source history. Unsupported openings now use the standard-plan fallback.
+  Reload and restart checks found no duplicate collectors; five-minute settings and
+  the complete bar layout were unchanged by this revision.
 - The pre-install `shell.json` backup was compared structurally with the final config
   after removing only the new plugin entry: all unrelated values and widget order matched.
 - No screenshots, local settings, personal quota history, database or credentials are
@@ -48,7 +54,11 @@ output; interleaved notifications/reply IDs; redacted errors; owned-process clea
 lock/reload deduplication; preserved server retry guidance; simulated resume gaps; five-minute polling/default migration; immediate deduplicated
 manual refresh; boundary-triggered collection; failures preserving successful timestamps;
 eight touched dates with seven IDs; active buckets spanning two cells; and civil-midnight
-outline changes without changing the virtual bucket.
+outline changes without changing the virtual bucket; exact 102/130/60 fallback ratios;
+above-100% visual clamping; supported-opening precedence; standard-basis persistence;
+nonmutation of stored evidence; equal residual allocation with fractional conservation;
+negative/inconsistent usage diagnostics; no future allocation; estimated corrections;
+and epoch/account isolation of provisional estimates.
 
 ## Reproduce QML analysis
 
@@ -70,7 +80,8 @@ The installed host sometimes caches changed QML through a plugin rescan, so a su
 
 ## Live-test limits
 
-A physical second monitor was unavailable; a native virtual output was tested instead.
+A physical second monitor was unavailable; a native virtual output was tested in 1.1.0.
+The unchanged shared-service architecture was checked for one collector in 1.2.0.
 The desktop was not physically suspended: an isolated helper was stopped/resumed in
 the integration test. Real weekly resets, early resets, DST changes and expired-login
 token refresh were not forced; reset/time behavior was covered with deterministic tests

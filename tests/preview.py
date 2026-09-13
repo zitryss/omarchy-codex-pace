@@ -13,16 +13,16 @@ from pace.view import project
 
 
 def fixture(name):
-    if name not in ('normal','unknown','screenshot','debt','zero','correction','stale','expired','auth','year','dst'):
+    if name not in ('normal','unknown','fallback','screenshot','debt','zero','correction','stale','expired','auth','year','dst'):
         raise ValueError('Unknown fixture')
     start=int(datetime(2026,12,29 if name=='year' else 10,18,tzinfo=timezone.utc).timestamp())
-    if name in ('unknown','screenshot'):
+    if name in ('unknown','fallback','screenshot'):
         start=int(datetime(2026,9,12,10,26,tzinfo=ZoneInfo('Europe/Berlin')).timestamp())
     if name=='dst':
         start=int(datetime(2026,3,27,18,tzinfo=timezone.utc).timestamp())
     def reading(at, r):
         return dict(account='synthetic',bucket='fixture',start=start,end=start+WEEK,at=at,
-                    source_at=at if name!='unknown' else None, timing_quality='source timestamp' if name!='unknown' else 'receipt timestamp',remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
+                    source_at=at if name not in ('unknown','fallback') else None, timing_quality='source timestamp' if name not in ('unknown','fallback') else 'receipt timestamp',remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
     with tempfile.TemporaryDirectory(prefix='codex-pace-fixture-') as temp:
         store=Store(Path(temp)/'fixture.sqlite3')
         if name=='auth':
@@ -34,10 +34,10 @@ def fixture(name):
             if name=='correction':
                 now+=10; store.accept(reading(now,'95'))
             elif name not in ('debt','zero'):
-                now+=10; store.accept(reading(now,'87' if name in ('unknown','screenshot') else '84'))
-            if name in ('unknown','screenshot'):
+                now+=10; store.accept(reading(now,'87' if name in ('unknown','fallback','screenshot') else '84'))
+            if name in ('unknown','fallback','screenshot'):
                 now=start+86400+10*3600+23*60
-                store.accept(reading(now,'87'))
+                store.accept(reading(now,'86' if name=='fallback' else '87'))
             if name=='stale': now+=601
             if name=='expired': now=start+WEEK
             view=project(store,now)

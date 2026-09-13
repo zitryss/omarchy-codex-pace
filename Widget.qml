@@ -118,14 +118,19 @@ Panel {
                         spacing: Style.space(10)
                         Repeater {
                             model: [
-                                {label: "Today's allowance left", value: root.pct("daily"), fill: root.view.dailyFill || 0},
-                                {label: "Weekly allowance left", value: root.pct("weekly"), fill: root.view.weeklyFill || 0}
+                                {label: "Today's allowance left", value: root.pct("daily"), fill: root.view.dailyFill || 0, tip: root.view.planBasis || ""},
+                                {label: "Weekly allowance left", value: root.pct("weekly"), fill: root.view.weeklyFill || 0, tip: ""}
                             ]
                             Column {
                                 id: allowance
                                 required property var modelData
                                 width: parent.width
                                 spacing: Style.space(6)
+                                Accessible.description: allowance.modelData.tip
+                                HoverHandler { id: allowanceHover }
+                                ToolTip.visible: allowanceHover.hovered && !!allowance.modelData.tip
+                                ToolTip.delay: 550
+                                ToolTip.text: allowance.modelData.tip
                                 RowLayout {
                                     width: parent.width
                                     Label { text: allowance.modelData.label; Layout.fillWidth: true }
@@ -147,10 +152,12 @@ Panel {
                         }
                     }
                     Label {
-                        text: "Plan " + root.val("plan") + " · Used " + root.val("used")
+                        text: "Plan " + root.val("plan") + " · Used " + root.val("used") + (root.view.usedEstimated ? "*" : "")
                         MouseArea { id: planHover; anchors.fill: parent; hoverEnabled: true }
-                        ToolTip.visible: planHover.containsMouse && root.val("plan") === "—"
-                        ToolTip.text: "Bucket opening balance unavailable."
+                        ToolTip.visible: planHover.containsMouse && !!root.view.planBasis
+                        ToolTip.text: (root.view.planBasis || "") + "\n" + (root.view.usedBasis || "")
+                        Accessible.name: "Plan " + root.val("plan") + "; Used " + root.val("used") + (root.view.usedEstimated ? " estimated" : "")
+                        Accessible.description: (root.view.planBasis || "") + " " + (root.view.usedBasis || "")
                     }
                     Label {
                         visible: !!root.view.note
@@ -166,7 +173,7 @@ Panel {
                         RowLayout {
                             width: parent.width
                             Label { text: root.view.month || ""; font.bold: true; Layout.fillWidth: true }
-                            Label { text: "P plan · U used"; font.pixelSize: Style.font.body - 2; color: root.muted }
+                            Label { text: "P plan · U used" + (root.view.hasEstimates ? " · * estimated" : ""); font.pixelSize: Style.font.body - 2; color: root.muted }
                         }
                         Grid {
                             width: parent.width
@@ -194,30 +201,32 @@ Panel {
                                     required property var modelData
                                     width: parent.width / 7
                                     height: Style.space(58)
-                                    color: modelData.active ? "#a6c8ff" : modelData.highlighted ? Qt.alpha(Color.accent, 0.12) : "transparent"
-                                    border.width: modelData.today ? 2 : 0
+                                    color: modelData.active ? "#3d5275" : modelData.highlighted ? Qt.alpha(Color.accent, 0.12) : "transparent"
+                                    border.width: modelData.today ? 3 : 0
                                     border.color: "#a33b4d"
+                                    Accessible.name: modelData.date
+                                    Accessible.description: modelData.detail
                                     Column {
                                         anchors.centerIn: parent
                                         spacing: Style.space(3)
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             text: cell.modelData.day
-                                            color: cell.modelData.active ? "#182337" : cell.modelData.muted ? root.muted : root.fg
+                                            color: cell.modelData.active ? root.fg : cell.modelData.muted ? root.muted : root.fg
                                             font.bold: cell.modelData.active
                                         }
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             visible: cell.modelData.entries.length > 0
                                             text: cell.modelData.entries.length ? "P " + cell.modelData.entries[0].plan : ""
-                                            color: cell.modelData.active ? "#182337" : cell.modelData.entries.length && cell.modelData.entries[0].future ? root.muted : root.fg
+                                            color: cell.modelData.active ? root.fg : cell.modelData.entries.length && cell.modelData.entries[0].future ? root.muted : root.fg
                                             font.pixelSize: Style.font.body - 3
                                         }
                                         Label {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             visible: cell.modelData.entries.length > 0
-                                            text: cell.modelData.entries.length ? "U " + cell.modelData.entries[0].used : ""
-                                            color: cell.modelData.active ? "#354663" : root.muted
+                                            text: cell.modelData.entries.length ? "U " + cell.modelData.entries[0].used + (cell.modelData.entries[0].usedEstimated ? "*" : "") : ""
+                                            color: cell.modelData.active ? Qt.alpha(root.fg, 0.85) : root.muted
                                             font.pixelSize: Style.font.body - 3
                                         }
                                     }

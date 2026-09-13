@@ -49,19 +49,55 @@ source timestamp null. Even close or identical readings straddling a boundary do
 prove where consumption occurred. Boundary refreshes preserve useful evidence without
 silently converting it into an exact opening. Source rounding is a separate uncertainty.
 
-Unknown openings mean unknown Plan, Used and daily percentage; A and R remain calculable.
-The equal base plan is used only as a future forecast. Supported openings, when available,
-produce 100% at opening for positive plans, including surplus or debt. For historical
-full-bucket Used, both opening and closing evidence are required; a last pre-boundary
-reading is not a full closing balance. Offline gaps are never assigned to later buckets.
+Without supported opening evidence, the current bucket uses the standard-plan basis:
+
+```
+Plan           = B = 100/7
+DailyPercent   = 100 × A/B
+estimated Used = max(0, B−A)
+```
+
+This denominator is the equal base allocation, not an invented opening balance or a
+launch-time baseline. Values above 100% are intentional and do not alone imply a provider
+correction. The standard basis remains until genuine opening evidence becomes available.
+For bucket two, remaining 86, 90 and 80 produce daily percentages 102, 130 and 60, and
+Used 0*, 0* and 5*. Ratios use exact fractions before display flooring; current Used is
+a pacing shortfall which can reflect earlier overspending, not measured consumption.
+
+Supported openings take precedence and produce 100% at opening for positive plans,
+including surplus or debt. A supported zero plan remains zero with an unavailable ratio.
+For historical full-bucket Used, both opening and closing evidence are required; a last
+pre-boundary reading is not a full closing balance. Offline gaps remain unsampled evidence.
 The ledger's source-timestamp path is covered with explicitly synthetic supported-opening
 fixtures; it is not claimed as a capability of the installed provider contract.
+
+Missing plans use B for every bucket; supported plans remain frozen. Future Used is
+unknown. Completed buckets with unknown usage may receive a provisional equal share of:
+
+```
+residual = (100−R) − supported completed-bucket Used − current Used
+```
+
+Current Used uses its supported basis when available, otherwise the pacing shortfall.
+Only a nonnegative residual with no negative measured net corrections can be allocated.
+No eligible completed buckets, contradictory evidence or negative corrections leave the
+residual unresolved. The projection exposes `estimateResidual` and `estimateDiagnostic`
+for diagnostics. Existing measured history is never adjusted to force a sum. The raw
+residual is divided exactly, so individually floored displays need not sum to the total.
+No spending is assigned to future buckets or to another provider epoch. These values are
+assumptions, not a reconstruction of unavailable consumption timing.
+
+Provisional estimates are copied into the read-only presentation projection and recomputed
+from source observations. They are never written to SQLite or promoted to measurements.
+Each estimated Used receives an asterisk, the compact legend says “* estimated”, and cell
+and metric details explain its basis. No partial tracked delta is spliced into a full
+bucket total. Provider rounding remains distinct from these pacing assumptions.
 
 The original screenshot's late balance 88 mathematically produced Plan 116/7 and, at
 balance 87, daily left 109/116 × 100 = 93% after flooring. It was a launch-time basis,
 not evidence of the bucket opening. Schema migration retains that legacy row and all
 snapshots for export, but excludes unsupported legacy baselines from full-bucket metrics.
-No historical usage is inferred from total weekly consumption or token counts.
+Measured historical usage is never inferred from estimates or token counts.
 
 Whole-number snapshots do not establish the provider's rounding rule, an error bound
 or exactly zero consumption between identical readings. The ledger records reported
@@ -75,8 +111,8 @@ The Monday-first calendar assigns exactly seven bucket IDs to their **start** da
 Future P shows floored 100/7; future U is unknown. Adjacent month/year edge weeks are
 included when needed. Rare duplicate civil start dates keep both IDs in that cell's
 tooltip. All dates with nonempty overlap with [S,E) have a subtle connected background, and
-all dates overlapping the active virtual bucket have a light-blue fill. The actual
-local date has a separate dark-red outline which advances at civil midnight. Midnight
+all dates overlapping the active virtual bucket have a muted blue fill. The actual
+local date has a separate three-pixel dark-red outline which advances at civil midnight. Midnight
 boundaries are converted separately through the local timezone, including DST; they
 never define a second quota schedule. A final partial date can be highlighted without
 an eighth P/U entry. An exact-midnight E does not include its new civil date.

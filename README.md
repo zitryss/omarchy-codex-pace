@@ -56,17 +56,26 @@ update status for the weekly deadline, correction and over-plan details.
 
 Seven exact 100/7 allocations follow the provider's actual 168-hour window. Surplus/debt
 is reflected once in the frozen opening plan. All displayed amounts are floored after
-exact rational calculation. **Unknown openings show Plan, Used and daily percentage
-as —**; available quota, weekly balance and countdowns remain useful. A launch-time
-balance is not a bucket opening. The installed app-server supplies no verified sampling
-timestamp, so receipt-only boundary readings remain uncertain and cannot establish
-full-bucket usage. No equal-allocation backfill or launch denominator is used.
+exact rational calculation. With no supported opening balance, the **standard-plan
+fallback** uses Plan 100/7, daily percentage `100 × available / (100/7)`, and Used
+`max(0, 100/7 − available)`. The label may exceed 100%; only the bar is capped.
+For bucket two at 86% weekly remaining: Available 14%, Plan 14, daily left 102%,
+Used 0*. The full-precision available amount is 102/7, not exactly 14.
+
+An asterisk and **“* estimated”** legend identify provisional Used values. Current Used
+is a pacing shortfall, not reconstructed consumption. Completed buckets with missing
+usage may share residual reported weekly usage equally after subtracting supported
+full-bucket usage and current Used. Contradictions stay unresolved with diagnostic
+details; future Used remains unknown. Estimates never enter stored source history.
+Supported opening data takes precedence and freezes the actual opening plan, including
+surplus/debt. Merely collecting more mid-bucket readings cannot establish that opening.
+Hover the daily allowance or Plan/Used line for the basis and estimate explanation.
 
 The calendar highlights every date overlapping the provider week; an active bucket has
-a light-blue fill, and the actual local date has a dark-red outline. Seven P/U entries
+a muted blue fill, and the actual local date has a dark-red outline. Seven P/U entries
 remain attached once to bucket start dates. A midday reset normally touches eight dates;
-an exact-midnight endpoint excludes the new date. Future P is the base forecast 14,
-not a known opening plan. See [ACCOUNTING.md](ACCOUNTING.md) for evidence semantics.
+an exact-midnight endpoint excludes the new date. Missing P defaults to the base 14 for past, current and future entries;
+supported historical plans take precedence. See [ACCOUNTING.md](ACCOUNTING.md) for evidence semantics.
 This is a pacing guide, not enforcement or a promise that a shorter limit permits use.
 
 Private local state is under `${XDG_STATE_HOME:-~/.local/state}/omarchy/codex-pace/`.
@@ -127,7 +136,7 @@ omarchy-shell shell summon c3po.codex-pace
 omarchy-shell c3po.codex-pace.HDMI-A-1 clearPreview
 ```
 
-Available fixtures: `normal`, `unknown`, `screenshot`, `debt`, `zero`, `correction`, `stale`, `expired`, `auth`,
+Available fixtures: `normal`, `unknown`, `fallback`, `screenshot`, `debt`, `zero`, `correction`, `stale`, `expired`, `auth`,
 `year`, `dst`. `tests/preview.py NAME` also emits their JSON without opening a window.
 See [VALIDATION.md](VALIDATION.md) for recorded checks and live-test limits.
 
@@ -138,20 +147,15 @@ The installed Omarchy source and generated Codex schema take precedence over the
 
 ## Revision rollback
 
-Schema 2 preserves legacy snapshots and baseline rows; it does not erase useful history.
-Before upgrading a schema-1 installation, disable the plugin and back up its ledger and
-settings in the state directory. This installation has that backup in `backups/revision-1.1`.
-To restore this installation's previous release, first preserve post-upgrade history:
+Version **1.2.0** retains the schema-2 ledger, settings and source observations unchanged.
+To return to 1.1.0 without discarding history (from a clean plugin checkout):
 
 ```bash
 omarchy plugin disable c3po.codex-pace
-python3 -B ~/.config/omarchy/plugins/c3po.codex-pace/pace.py export >   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/post-upgrade-history.json"
-git -C ~/.config/omarchy/plugins/c3po.codex-pace switch --detach a900f78ef245ed54bd2a59902e0f0b7f79ad16bb
-cp -p "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/ledger.sqlite3"   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/ledger.sqlite3"
-cp -p "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/backups/revision-1.1/settings.json"   "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/codex-pace/settings.json"
+git -C ~/.config/omarchy/plugins/c3po.codex-pace switch --detach d8ae7b1c4c3c02bdcc33ab5c1b257ad2b3a8cd8f
 omarchy plugin enable c3po.codex-pace --after omarchy.agents
 omarchy restart shell
 ```
 
-This restores the older ledger from its backup; the export retains newer evidence for
-reference. Ordinary disable/uninstall does not restore or delete history.
+To return to the published revision, disable, `git switch main` in that checkout, then
+re-enable and restart as above. Neither rollback nor ordinary uninstall erases history.

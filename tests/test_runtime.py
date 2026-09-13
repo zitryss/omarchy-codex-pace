@@ -108,7 +108,7 @@ class RuntimeTests(unittest.TestCase):
         self.view(process,lambda v:v.get('pending'))
         self.view(process,lambda v:v.get('valid') and not v.get('pending'))
         self.assertEqual(len(self.marker.read_text().splitlines()),2)
-        self.assertEqual(initial['plan'],'—')
+        self.assertEqual(initial['plan'],'14')
         # No old one-minute timer: a five-minute deadline is persisted.
         database=self.root/'state/omarchy/codex-pace/ledger.sqlite3'
         with sqlite3.connect(database) as db:
@@ -123,7 +123,7 @@ class RuntimeTests(unittest.TestCase):
         self.view(process,lambda v:v.get('pending') and v.get('valid'))
         view=self.view(process,lambda v:v.get('valid') and not v.get('pending'))
         self.assertEqual(view['days'],'4')
-        self.assertEqual(view['daily'],'—')
+        self.assertEqual(view['daily'],'293')
         self.assertEqual(len(self.marker.read_text().splitlines()),2)
         process.stdin.write(b'stale\n'*10); process.stdin.flush()
         self.view(process,lambda v:not v.get('pending'))

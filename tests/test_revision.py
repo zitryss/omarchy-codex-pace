@@ -37,7 +37,7 @@ class RevisionTests(unittest.TestCase):
                 store.accept(reading(now,'87',start=START,end=START+WEEK,source_at=None,timing_quality='receipt timestamp'))
                 view=project(store,now)
                 self.assertEqual((view['available'],view['weekly'],view['days'],view['countdown']),('15','87','5','13h 37m'))
-                self.assertEqual((view['plan'],view['daily'],view['used']),('16','93','1') if known else ('—','—','—'))
+                self.assertEqual((view['plan'],view['daily'],view['used']),('16','93','1') if known else ('14','109','0'))
                 self.assertNotIn('Since tracking began',json.dumps(view))
                 self.assertEqual(store.db.execute('SELECT count(*) FROM snapshots').fetchone()[0],2)
                 self.assertEqual(store.db.execute('SELECT opening FROM buckets WHERE idx=1').fetchone()[0],'88')
@@ -81,7 +81,7 @@ class RevisionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             store=Store(Path(d)/'ledger')
             store.accept(reading(0,source_at=None,timing_quality='receipt timestamp'))
-            self.assertEqual(project(store,0)['daily'],'—')
+            self.assertEqual(project(store,0)['daily'],'100')
             self.assertIn('receipt timestamp',project(store,0)['detail'])
             store.db.close()
 

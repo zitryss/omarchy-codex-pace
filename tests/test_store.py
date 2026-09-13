@@ -55,7 +55,7 @@ class StoreTests(unittest.TestCase):
         self.add(86420,'88')
         self.add(86430,'84')
         v=project(self.store,86430)
-        self.assertEqual((v['plan'],v['available'],v['daily'],v['used']),('—','12','—','—'))
+        self.assertEqual((v['plan'],v['available'],v['daily'],v['used']),('14','12','88','1'))
         self.assertEqual(v['note'],'')
         self.assertIn('opening balance unavailable',v['detail'])
         self.assertEqual(self.store.records(self.store.get('reading'))[0]['plan'],None)
@@ -83,8 +83,8 @@ class StoreTests(unittest.TestCase):
         v=project(self.store,86400)
         self.assertEqual(v['days'],'5')
         self.assertEqual(v['countdown'],'24h 00m')
-        self.assertEqual(v['plan'],'—')
-        self.assertEqual(v['daily'],'—')
+        self.assertEqual(v['plan'],'14')
+        self.assertEqual(v['daily'],'116')
         self.assertEqual(v['available'],'16')
 
     def test_out_of_order_is_rejected(self):
