@@ -58,7 +58,7 @@ def pacing(remaining, active, records):
         result.update(plan=BASE, ratio=100 * result['available'] / BASE,
                       used=max(Fraction(0), BASE - result['available']))
         current['usedEstimated'] = True
-        current['usedBasis'] = ('Estimated shortfall against the standard daily allowance: max(0, 100/7 - available). '
+        current['usedBasis'] = ('Estimated shortfall against the standard daily quota: max(0, 100/7 - available). '
                                 'Earlier overspending may contribute; this is not measured bucket consumption.')
     current.update(plan=result['plan'], used=result['used'])
 

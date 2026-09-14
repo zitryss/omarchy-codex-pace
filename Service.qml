@@ -35,7 +35,7 @@ Item {
     // Explicit read-only test surface; synthetic data never enters the live ledger.
     function clearPreview() { previewView = null; previewExpiry.stop() }
     function preview(name) {
-        if (["normal", "unknown", "fallback", "screenshot", "debt", "zero", "correction", "stale", "expired", "auth", "year", "dst"].indexOf(name) < 0)
+        if (["normal", "unknown", "fallback", "screenshot", "debt", "zero", "correction", "stale", "expired", "auth", "year", "dst", "boundary", "near-reset", "empty", "spent", "long-error"].indexOf(name) < 0)
             return "unknown fixture"
         if (previewWorker.running) return "busy"
         previewWorker.command = ["python3", "-B", decodeURIComponent(Qt.resolvedUrl("tests/preview.py").toString().replace(/^file:\/\//, "")), name]

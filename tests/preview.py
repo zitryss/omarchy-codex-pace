@@ -13,7 +13,7 @@ from pace.view import project
 
 
 def fixture(name):
-    if name not in ('normal','unknown','fallback','screenshot','debt','zero','correction','stale','expired','auth','year','dst'):
+    if name not in ('normal','unknown','fallback','screenshot','debt','zero','correction','stale','expired','auth','year','dst','boundary','near-reset','empty','spent','long-error'):
         raise ValueError('Unknown fixture')
     start=int(datetime(2026,12,29 if name=='year' else 10,18,tzinfo=timezone.utc).timestamp())
     if name in ('unknown','fallback','screenshot'):
@@ -25,8 +25,8 @@ def fixture(name):
                     source_at=at if name not in ('unknown','fallback') else None, timing_quality='source timestamp' if name not in ('unknown','fallback') else 'receipt timestamp',remaining=r,credits=None,provenance='synthetic fixture',precision='reported integer',short=False)
     with tempfile.TemporaryDirectory(prefix='codex-pace-fixture-') as temp:
         store=Store(Path(temp)/'fixture.sqlite3')
-        if name=='auth':
-            view=project(store,start,error='Run codex login with your existing subscription')
+        if name in ('auth','empty'):
+            view=project(store,start,error='Run codex login with your existing subscription' if name=='auth' else '')
         else:
             now=start+86400
             opening='60' if name in ('debt','zero') else '88'
@@ -40,7 +40,11 @@ def fixture(name):
                 store.accept(reading(now,'86' if name=='fallback' else '87'))
             if name=='stale': now+=601
             if name=='expired': now=start+WEEK
-            view=project(store,now)
+            if name=='boundary': now=start+2*86400
+            if name=='near-reset': now=start+WEEK-30
+            if name=='spent':
+                now+=1; store.accept(reading(now,'0'))
+            view=project(store,now,error=('Collector unavailable. Check the existing Codex CLI login and retry. ' * 15) if name=='long-error' else '')
         view['fixture']=name
         store.db.close()
         return view

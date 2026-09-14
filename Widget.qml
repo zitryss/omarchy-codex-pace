@@ -20,20 +20,36 @@ Panel {
     implicitHeight: button.implicitHeight
     function val(key) { return view[key] === undefined ? "—" : String(view[key]) }
     function pct(key) { return val(key) === "—" ? "—" : val(key) + "%" }
+    function metricStatus() {
+        let rows = []
+        for (let i = 0; i < metrics.count; i++) {
+            let row = metrics.itemAt(i)
+            if (row) rows.push({label: row.label, reading: row.reading, fraction: row.fraction, color: String(row.fillColor), green: String(row.green), gray: String(row.gray), red: String(row.red)})
+        }
+        return rows
+    }
     onOpenedChanged: if (opened && service) service.refreshIfStale()
 
     // IPC belongs to the visual scene; one distinct endpoint per monitor.
     IpcHandler {
         enabled: !!root.QsWindow.window && !!root.QsWindow.window.screen
         target: root.moduleName + "." + (root.QsWindow.window?.screen?.name || "pending")
-        function status(): string { return JSON.stringify({opened: root.opened, scrollY: flick.contentY, contentHeight: flick.contentHeight, viewportHeight: flick.height, refreshFocused: refreshButton.activeFocus, refreshPosition: refreshButton.mapToGlobal(refreshButton.width/2, refreshButton.height/2), view: root.view}) }
+        function status(): string { return JSON.stringify({opened: root.opened, scrollY: flick.contentY, contentHeight: flick.contentHeight, viewportHeight: flick.height, scrollable: flick.interactive, metrics: root.metricStatus(), refreshFocused: refreshButton.activeFocus, refreshPosition: refreshButton.mapToGlobal(refreshButton.width/2, refreshButton.height/2), view: root.view}) }
         function open(): void { root.open() }
         function close(): void { root.close() }
         function refresh(): void { if (root.service) root.service.refresh() }
         function preview(name: string): string { return root.service ? root.service.preview(name) : "unavailable" }
+        function palette(fraction: real, clock: bool, light: bool): string {
+            let sample = metricProbe.createObject(root, {fraction: fraction, countdown: clock, background: light ? "#fafafa" : "#191b25"})
+            let result = JSON.stringify({color: String(sample.fillColor), green: String(sample.green), red: String(sample.red), gray: String(sample.gray)})
+            sample.destroy()
+            return result
+        }
         function clearPreview(): void { if (root.service) root.service.clearPreview() }
     }
 
+    // Read-only palette probe for native-host tests; never changes the desktop theme.
+    Component { id: metricProbe; MetricRow { label: "TEST palette"; reading: "TEST"; visible: false } }
     component Label: Text {
         color: root.fg
         font.family: Style.font.family
@@ -61,7 +77,7 @@ Panel {
         open: root.opened
         focusTarget: keys
         contentWidth: fittedContentWidth(Style.space(470))
-        contentHeight: fittedContentHeight(content.implicitHeight, Style.space(720))
+        contentHeight: Math.ceil(fittedContentHeight(Math.ceil(content.implicitHeight), Style.space(720)))
         PanelKeyCatcher {
             id: keys
             anchors.fill: parent
@@ -81,73 +97,36 @@ Panel {
             Flickable {
                 id: flick
                 anchors.fill: parent
-                contentHeight: content.implicitHeight
+                contentHeight: Math.ceil(content.implicitHeight)
                 contentWidth: width
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+                onInteractiveChanged: if (!interactive) contentY = 0
                 Column {
                     id: content
                     width: parent.width
                     spacing: Style.space(16)
                     Label { text: root.view.fixture ? "Codex Pace · TEST FIXTURE: " + root.view.fixture : "Codex Pace"; font.bold: true; font.pixelSize: Style.font.body + 2 }
-                    GridLayout {
-                        width: parent.width
-                        columns: width < Style.space(360) ? 1 : 3
-                        columnSpacing: Style.space(18)
-                        rowSpacing: Style.space(12)
-                        Repeater {
-                            model: [
-                                {label: "Available today", value: root.pct("available"), sub: "of weekly quota"},
-                                {label: "Bucket resets in", value: root.val("countdown"), sub: ""},
-                                {label: "Weekly reset", value: root.val("days"), sub: "days left"}
-                            ]
-                            ColumnLayout {
-                                id: metric
-                                required property var modelData
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignTop
-                                spacing: Style.space(5)
-                                Label { text: metric.modelData.label; color: root.muted; font.pixelSize: Style.font.body - 1 }
-                                Label { text: metric.modelData.value; font.pixelSize: Style.font.body + 12; font.bold: true }
-                                Label { text: metric.modelData.sub; color: root.muted; font.pixelSize: Style.font.body - 2 }
-                            }
-                        }
-                    }
                     Column {
                         width: parent.width
-                        spacing: Style.space(10)
+                        spacing: Style.space(12)
                         Repeater {
+                            id: metrics
                             model: [
-                                {label: "Today's allowance left", value: root.pct("daily"), fill: root.view.dailyFill || 0, tip: root.view.planBasis || ""},
-                                {label: "Weekly allowance left", value: root.pct("weekly"), fill: root.view.weeklyFill || 0, tip: ""}
+                                {label: "Today's quota left", reading: root.pct("daily"), fraction: root.val("daily") === "—" ? null : root.view.dailyFill / 100, clock: false, tip: root.view.planBasis || ""},
+                                {label: "Bucket resets in", reading: root.val("countdown"), fraction: root.view.bucketFill ?? null, clock: true, tip: "Time until the active provider-aligned planning bucket ends."},
+                                {label: "Weekly quota left", reading: root.pct("weekly"), fraction: root.val("weekly") === "—" ? null : root.view.weeklyFill / 100, clock: false, tip: "Remaining quota reported by Codex."},
+                                {label: "Weekly resets in", reading: root.val("weeklyCountdown"), fraction: root.view.weeklyResetFill ?? null, clock: true, tip: "Time until the provider's actual weekly quota reset."}
                             ]
-                            Column {
-                                id: allowance
+                            MetricRow {
                                 required property var modelData
                                 width: parent.width
-                                spacing: Style.space(6)
-                                Accessible.description: allowance.modelData.tip
-                                HoverHandler { id: allowanceHover }
-                                ToolTip.visible: allowanceHover.hovered && !!allowance.modelData.tip
-                                ToolTip.delay: 550
-                                ToolTip.text: allowance.modelData.tip
-                                RowLayout {
-                                    width: parent.width
-                                    Label { text: allowance.modelData.label; Layout.fillWidth: true }
-                                    Label { text: allowance.modelData.value; font.bold: true }
-                                }
-                                Rectangle {
-                                    width: parent.width
-                                    height: Style.space(5)
-                                    radius: height / 2
-                                    color: Qt.alpha(root.fg, 0.12)
-                                    Rectangle {
-                                        width: parent.width * allowance.modelData.fill / 100
-                                        height: parent.height
-                                        radius: parent.radius
-                                        color: Color.accent
-                                    }
-                                }
+                                label: modelData.label
+                                reading: modelData.reading
+                                fraction: modelData.fraction
+                                countdown: modelData.clock
+                                explanation: modelData.tip
                             }
                         }
                     }

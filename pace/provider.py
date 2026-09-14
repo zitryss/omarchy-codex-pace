@@ -139,7 +139,7 @@ def select(account, result, selected, now):
 
 async def collect(selected=None, command=None):
     async with RPC(command) as rpc:
-        await rpc.request('initialize', {'clientInfo': {'name':'codex-pace', 'version':'1.2.0'}})
+        await rpc.request('initialize', {'clientInfo': {'name':'codex-pace', 'version':'1.3.0'}})
         await rpc.send({'method':'initialized', 'params':{}})
         account = (await rpc.request('account/read')).get('account')
         if not isinstance(account, dict) or account.get('type') != 'chatgpt':

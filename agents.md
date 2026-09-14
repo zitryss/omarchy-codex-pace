@@ -69,7 +69,7 @@ full-bucket usage and current Used. Contradictions stay unresolved with diagnost
 details; future Used remains unknown. Estimates never enter stored source history.
 Supported opening data takes precedence and freezes the actual opening plan, including
 surplus/debt. Merely collecting more mid-bucket readings cannot establish that opening.
-Hover the daily allowance or Plan/Used line for the basis and estimate explanation.
+Hover the daily quota or Plan/Used line for the basis and estimate explanation.
 
 The calendar highlights every date overlapping the provider week; an active bucket has
 a muted blue fill, and the actual local date has a dark-red outline. Seven P/U entries
@@ -120,7 +120,8 @@ omarchy plugin validate .
 
 `pace/engine.py` is pure accounting/calendar logic; `provider.py` owns RPC/validation;
 `store.py` owns SQLite; `view.py` formats the projection; `pace.py` schedules collection.
-`Service.qml` bridges that projection to the themed native `Widget.qml`.
+`Service.qml` bridges that projection to the themed native `Widget.qml`, with four
+reusable `MetricRow.qml` rows for daily/weekly quota and their independent countdowns.
 The test suite covers arithmetic, boundaries, gaps, corrections, persistence, resets,
 account separation, month/year/DST transitions, formatting, independent progress bars,
 RPC/process failures, restart deduplication and persisted retry guidance. Synthetic RPC
@@ -137,7 +138,7 @@ omarchy-shell c3po.codex-pace.HDMI-A-1 clearPreview
 ```
 
 Available fixtures: `normal`, `unknown`, `fallback`, `screenshot`, `debt`, `zero`, `correction`, `stale`, `expired`, `auth`,
-`year`, `dst`. `tests/preview.py NAME` also emits their JSON without opening a window.
+`year`, `dst`, `boundary`, `near-reset`, `empty`, `spent`, `long-error`. `tests/preview.py NAME` also emits their JSON without opening a window.
 See [VALIDATION.md](VALIDATION.md) for recorded checks and live-test limits.
 
 References: [Omarchy native shell](https://github.com/basecamp/omarchy/blob/quattro/shell/README.md),
@@ -147,12 +148,12 @@ The installed Omarchy source and generated Codex schema take precedence over the
 
 ## Revision rollback
 
-Version **1.2.0** retains the schema-2 ledger, settings and source observations unchanged.
-To return to 1.1.0 without discarding history (from a clean plugin checkout):
+Version **1.3.0** retains the schema-2 ledger, settings and source observations unchanged.
+To return to 1.2.0 without discarding history (from a clean plugin checkout):
 
 ```bash
 omarchy plugin disable c3po.codex-pace
-git -C ~/.config/omarchy/plugins/c3po.codex-pace switch --detach d8ae7b1c4c3c02bdcc33ab5c1b257ad2b3a8cd8f
+git -C ~/.config/omarchy/plugins/c3po.codex-pace switch --detach 5363056eb6436d4889345acc281f5b544b84d3e6
 omarchy plugin enable c3po.codex-pace --after omarchy.agents
 omarchy restart shell
 ```

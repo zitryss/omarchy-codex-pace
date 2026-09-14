@@ -28,11 +28,11 @@ available A     = max(0, R−F)
 opening plan P  = max(0, R_open−F)
 used U          = R_open−R
 daily left      = 100·A/P, only when P > 0 and opening is supported
-weekly days     = 6−i
+weekly countdown= E−now
 bucket countdown= S+(i+1)·D/7−now
 ```
 
-Unused allowance and previous overspending are already reflected in R; debt is never
+Unused quota and previous overspending are already reflected in R; debt is never
 subtracted a second time. All arithmetic uses `Fraction`, including future fractional
 snapshots. Seven base grants total exactly 100. Every nonnegative displayed amount is
 floored; the ratio is calculated **before** flooring. Bars use the displayed percentage,
@@ -140,3 +140,20 @@ Only one automatic timer runs; local countdown/age ticks do not spawn requests. 
 last good data retains its original timestamp. The display is recalculated each second
 without extra provider requests. Quota notifications are not treated as a complete
 record of other clients' activity.
+
+## Four-bar presentation
+
+Daily and weekly quota fills use their floored displayed percentages, clamped visually
+to 0–100; daily labels can exceed 100. The available-today value remains in the projection
+for accounting and diagnostics. It is no longer a separate top metric.
+
+Countdowns use elapsed UTC seconds: bucket fill is `(bucketEnd−now)/86400`, and weekly
+fill is `(E−now)/604800`, each bounded to 0–1. The weekly label includes days only at
+24 hours or more. No countdown is derived from civil-day length or the compatibility
+`days` field. Missing, unverified and expired windows have unknown countdowns and null
+fills. Stale readings retain their timestamp/status. No new epoch is invented at expiry.
+
+`MetricRow.qml` shares layout and color interpolation. Quota fills interpolate red to
+green as the fraction rises; countdown fills interpolate green to gray. Dark/light
+surface palettes keep color supplemental to ordinary readable numeric labels. Local
+projection ticks update all four bars without increasing five-minute provider polling.

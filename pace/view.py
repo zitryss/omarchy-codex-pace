@@ -1,14 +1,41 @@
 """One presentation projection for all monitors. Calculations stay in the engine."""
 from datetime import datetime
+import math
 from .engine import number, index, whole, countdown, month_cells, pacing, WEEK
 
+
+
+def reset_duration(seconds):
+    if seconds is None or seconds <= 0:
+        return '—'
+    if seconds < 60:
+        return '<1m'
+    minutes = int(seconds // 60)
+    days, minutes = divmod(minutes, 1440)
+    hours, minutes = divmod(minutes, 60)
+    return (f'{days}d ' if days else '') + f'{hours}h {minutes:02d}m'
+
+
+def countdown_fields(start, end, now):
+    active = index(start, end, now) if all(type(t) in (int, float) and math.isfinite(t) for t in (start, end, now)) else None
+    if active is None:
+        return dict(bucketSeconds=None, weeklySeconds=None, bucketFill=None,
+                    weeklyResetFill=None, weeklyCountdown='—')
+    bucket_seconds = start + (active + 1) * (WEEK // 7) - now
+    weekly_seconds = end - now
+    return dict(bucketSeconds=bucket_seconds, weeklySeconds=weekly_seconds,
+                bucketFill=max(0, min(1, bucket_seconds / 86400)),
+                weeklyResetFill=max(0, min(1, weekly_seconds / WEEK)),
+                weeklyCountdown=reset_duration(weekly_seconds))
 
 def project(store, now, interval=300, error=''):
     reading = store.get('reading')
     empty = dict(available='—', daily='—', weekly='—', plan='—', used='—', days='—',
                  countdown='—', credits='—', dailyFill=0, dailyKnown=False, weeklyFill=0, cells=[], month='',
                  status=error or 'Reading Codex quota…', note='', detail='', valid=False,
-                 usedEstimated=False, hasEstimates=False, planBasis='', usedBasis='')
+                 usedEstimated=False, hasEstimates=False, planBasis='', usedBasis='',
+                 bucketSeconds=None, weeklySeconds=None, bucketFill=None,
+                 weeklyResetFill=None, weeklyCountdown='—')
     if not reading:
         return empty
     age = now-reading['at']
@@ -35,7 +62,7 @@ def project(store, now, interval=300, error=''):
     record = records[i]
     notes = []
     if b['plan'] == 0:
-        notes.append('No allowance available')
+        notes.append('No quota available')
     if reading.get('short'):
         notes.append('Shorter quota window exhausted')
     if reading.get('correction') or (b['used'] is not None and b['used'] < 0) or (not estimate['fallback'] and b['ratio'] is not None and b['ratio'] > 100):
@@ -62,4 +89,5 @@ def project(store, now, interval=300, error=''):
                 usedEstimated=record['usedEstimated'], hasEstimates=any(x['usedEstimated'] for x in records),
                 planBasis=record['planBasis'], usedBasis=record['usedBasis'],
                 basis='standard' if estimate['fallback'] else 'opening',
-                estimateResidual=estimate['residual'], estimateDiagnostic=estimate['diagnostic'])
+                estimateResidual=estimate['residual'], estimateDiagnostic=estimate['diagnostic'],
+                **countdown_fields(reading['start'], reading['end'], now))
