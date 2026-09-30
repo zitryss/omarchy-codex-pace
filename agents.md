@@ -49,8 +49,7 @@ Requests are deduplicated, including across monitors, and respect server retry g
 The button dims while pending. Failures retain the successful reading's original age.
 Escape closes; Up/Down or J/K scroll. Tab focuses Refresh, then switches native panels.
 The icon accepts mouse clicks and keyboard activation. No keybinding is installed.
-Hover a calendar cell for overlapping bucket ranges and opening evidence; hover the
-update status for the weekly deadline, correction and over-plan details.
+Hover the update status for the weekly deadline, correction and over-plan details.
 
 ## Accounting and local data
 
@@ -62,20 +61,11 @@ fallback** uses Plan 100/7, daily percentage `100 × available / (100/7)`, and U
 For bucket two at 86% weekly remaining: Available 14%, Plan 14, daily left 102%,
 Used 0*. The full-precision available amount is 102/7, not exactly 14.
 
-An asterisk and **“* estimated”** legend identify provisional Used values. Current Used
-is a pacing shortfall, not reconstructed consumption. Completed buckets with missing
-usage may share residual reported weekly usage equally after subtracting supported
-full-bucket usage and current Used. Contradictions stay unresolved with diagnostic
-details; future Used remains unknown. Estimates never enter stored source history.
-Supported opening data takes precedence and freezes the actual opening plan, including
-surplus/debt. Merely collecting more mid-bucket readings cannot establish that opening.
-Hover the daily quota or Plan/Used line for the basis and estimate explanation.
-
-The calendar highlights every date overlapping the provider week; an active bucket has
-a muted blue fill, and the actual local date has a dark-red outline. Seven P/U entries
-remain attached once to bucket start dates. A midday reset normally touches eight dates;
-an exact-midnight endpoint excludes the new date. Missing P defaults to the base 14 for past, current and future entries;
-supported historical plans take precedence. See [ACCOUNTING.md](ACCOUNTING.md) for evidence semantics.
+The panel shows four quota/reset bars, resets available, and the update age. Plan/Used
+values and the calendar are not displayed. Internal accounting retains the daily basis
+needed to calculate today's quota. Supported opening data takes precedence and includes
+surplus/debt; mid-bucket readings cannot establish that opening. Hover the daily quota
+for its basis. See [ACCOUNTING.md](ACCOUNTING.md) for evidence semantics.
 This is a pacing guide, not enforcement or a promise that a shorter limit permits use.
 
 Private local state is under `${XDG_STATE_HOME:-~/.local/state}/omarchy/codex-pace/`.

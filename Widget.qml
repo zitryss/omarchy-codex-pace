@@ -13,7 +13,7 @@ Panel {
     manageIpc: false
     property var shell: null
     readonly property var service: shell ? shell.serviceFor(moduleName) : (bar && bar.shell ? bar.shell.serviceFor(moduleName) : null)
-    readonly property var view: service ? service.view : ({status: "Collector unavailable", cells: []})
+    readonly property var view: service ? service.view : ({status: "Collector unavailable"})
     readonly property color fg: Color.foreground
     readonly property color muted: Qt.alpha(fg, 0.60)
     implicitWidth: button.implicitWidth
@@ -131,91 +131,12 @@ Panel {
                         }
                     }
                     Label {
-                        text: "Plan " + root.val("plan") + " · Used " + root.val("used") + (root.view.usedEstimated ? "*" : "")
-                        MouseArea { id: planHover; anchors.fill: parent; hoverEnabled: true }
-                        ToolTip.visible: planHover.containsMouse && !!root.view.planBasis
-                        ToolTip.text: (root.view.planBasis || "") + "\n" + (root.view.usedBasis || "")
-                        Accessible.name: "Plan " + root.val("plan") + "; Used " + root.val("used") + (root.view.usedEstimated ? " estimated" : "")
-                        Accessible.description: (root.view.planBasis || "") + " " + (root.view.usedBasis || "")
-                    }
-                    Label {
                         visible: !!root.view.note
                         text: root.view.note || ""
                         color: root.muted
                         width: parent.width
                         wrapMode: Text.WordWrap
                         font.pixelSize: Style.font.body - 2
-                    }
-                    Column {
-                        width: parent.width
-                        spacing: Style.space(8)
-                        RowLayout {
-                            width: parent.width
-                            Label { text: root.view.month || ""; font.bold: true; Layout.fillWidth: true }
-                            Label { text: "P plan · U used" + (root.view.hasEstimates ? " · * estimated" : ""); font.pixelSize: Style.font.body - 2; color: root.muted }
-                        }
-                        Grid {
-                            width: parent.width
-                            columns: 7
-                            Repeater {
-                                model: ["M", "T", "W", "T", "F", "S", "S"]
-                                Label {
-                                    required property string modelData
-                                    width: parent.width / 7
-                                    text: modelData
-                                    horizontalAlignment: Text.AlignHCenter
-                                    color: root.muted
-                                    font.pixelSize: Style.font.body - 2
-                                }
-                            }
-                        }
-                        Grid {
-                            width: parent.width
-                            columns: 7
-                            rowSpacing: Style.space(3)
-                            Repeater {
-                                model: root.view.cells || []
-                                Rectangle {
-                                    id: cell
-                                    required property var modelData
-                                    width: parent.width / 7
-                                    height: Style.space(58)
-                                    color: modelData.active ? "#3d5275" : modelData.highlighted ? Qt.alpha(Color.accent, 0.12) : "transparent"
-                                    border.width: modelData.today ? 3 : 0
-                                    border.color: "#a33b4d"
-                                    Accessible.name: modelData.date
-                                    Accessible.description: modelData.detail
-                                    Column {
-                                        anchors.centerIn: parent
-                                        spacing: Style.space(3)
-                                        Label {
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            text: cell.modelData.day
-                                            color: cell.modelData.active ? root.fg : cell.modelData.muted ? root.muted : root.fg
-                                            font.bold: cell.modelData.active
-                                        }
-                                        Label {
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            visible: cell.modelData.entries.length > 0
-                                            text: cell.modelData.entries.length ? "P " + cell.modelData.entries[0].plan : ""
-                                            color: cell.modelData.active ? root.fg : cell.modelData.entries.length && cell.modelData.entries[0].future ? root.muted : root.fg
-                                            font.pixelSize: Style.font.body - 3
-                                        }
-                                        Label {
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            visible: cell.modelData.entries.length > 0
-                                            text: cell.modelData.entries.length ? "U " + cell.modelData.entries[0].used + (cell.modelData.entries[0].usedEstimated ? "*" : "") : ""
-                                            color: cell.modelData.active ? Qt.alpha(root.fg, 0.85) : root.muted
-                                            font.pixelSize: Style.font.body - 3
-                                        }
-                                    }
-                                    MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true }
-                                    ToolTip.visible: hover.containsMouse && modelData.highlighted
-                                    ToolTip.delay: 550
-                                    ToolTip.text: modelData.detail
-                                }
-                            }
-                        }
                     }
                     RowLayout {
                         width: parent.width
