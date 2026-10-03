@@ -6,6 +6,8 @@ Codex Pace is an Omarchy bar plugin that helps you keep a steady, even pace of A
 
 It divides your quota week into seven equal, 24-hour planning buckets, each with one-seventh of the quota (displayed as 14%). Spend less and the surplus is available the next day. Spend more and the next day's quota shrinks. Any unused quota expires at the weekly reset.
 
+![Codex Pace compact quota panel](https://raw.githubusercontent.com/zitryss/omarchy-codex-pace/4b336b3c53194eeb86a35d7b247b7d6be180e681/docs/screenshots/codex-pace-compact.png)
+
 ## Reading the display
 
 Four compact bars show your quota and time to reset:
