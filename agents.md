@@ -138,7 +138,7 @@ The installed Omarchy source and generated Codex schema take precedence over the
 
 ## Revision rollback
 
-Version **1.3.0** retains the schema-2 ledger, settings and source observations unchanged.
+Version **1.3.1** retains the schema-2 ledger, settings and source observations unchanged.
 To return to 1.2.0 without discarding history (from a clean plugin checkout):
 
 ```bash
